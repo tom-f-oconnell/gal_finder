@@ -1,101 +1,23 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import pandas as pd
+
+# necessary?
+import urllib2
+import cookielib
 import urllib
+# don't have this one right now
+#import requests
+
+# need to use python 2 because mechanize is not (yet?) supported in 3
+import mechanize
+
+from bs4 import BeautifulSoup
 
 # TODO manually remove stocks that are struck through on sheet
 df = pd.read_csv('./dickinson_janelia_gals.csv')
 
 url = 'http://flweb.janelia.org/cgi-bin/flew.cgi'
-payload = '''Content-Type: multipart/form-data; boundary=---------------------------21080268983277907471363809946
-Content-Length: 2570
-
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name="_search_toggle"
-
-general
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name="lines"
-
-
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name="line"
-
-R64H11
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name="genes"
-
-
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name="_gsearch"
-
-Search
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name="_search_logic"
-
-AND
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name="llines"
-
-
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name="_larval_search_logic"
-
-AND
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name="mlines"
-
-
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name="_disc_search_logic"
-
-AND
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name="dlines"
-
-
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name="_embryo_search_logic"
-
-AND
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name=".cgifields"
-
-_search_toggle
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name=".cgifields"
-
-dline
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name=".cgifields"
-
-gene
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name=".cgifields"
-
-mline
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name=".cgifields"
-
-term
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name=".cgifields"
-
-lline
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name=".cgifields"
-
-gfp_pattern
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name=".cgifields"
-
-line
------------------------------21080268983277907471363809946
-Content-Disposition: form-data; name=".cgifields"
-
-lterm
------------------------------21080268983277907471363809946--
-'''
 
 header = {'Host': 'flweb.janelia.org',
           'User-Agent': 
@@ -111,21 +33,78 @@ header = {'Host': 'flweb.janelia.org',
           'multipart/form-data; boundary=---------------------------21080268983277907471363809946',
           'Content-Length': '2570'}
         
-args = urllib.parse.urlencode({'line': 'R64H11'})
+#args = urllib.parse.urlencode({'line': 'R39A05'})
 
-#urllib.request.Request(url, data=payload)
-#d = urllib.urlopen(url, data=payload)
-#d = urllib.urlopen(url, data=args.encode('ascii'))
-#d = urllib.request.Request(url, data=args.encode('ascii'))
-#d = urllib.request.urlopen(url, data=payload.encode('ascii'), headers=header)
-r = urllib.request.Request(url, data=payload.encode('ascii'), headers=header)
-with urllib.request.urlopen(r) as f:
-    s = f.read()
+br = mechanize.Browser()
 
-'''
+#br.set_all_readonly(False)
+br.set_handle_robots(False)
+br.set_handle_redirect(True)
+br.set_handle_refresh(False)
+br.set_handle_referer(True)
+br.set_handle_gzip(True)
+
+
 for i in range(0,len(df)):
     nick = df.loc[i,:]['nickname']
     if type(nick) is str:
         janelia_id = df.loc[i,:]['nickname'][:6]
         print(janelia_id)
-'''
+
+        br.open(url) 
+
+        # the page actually only has one 'form'
+        br.select_form(nr=0)
+        # might want to use lines instead (just a string arg)
+        br['line'] = [janelia_id]
+        r = br.submit()
+        data = r.read()
+
+        soup = BeautifulSoup(data, 'lxml')
+        #print(soup.prettify())
+
+        # the contents of the table listing information about matching lines
+        t = soup.find('table', id='linelist')
+        #print(t.prettify())
+
+        break_all = False
+
+        for i, c in enumerate(t.children):
+            '''
+            print(i, c)
+            print('')
+            print('')
+            '''
+
+            # i = 2 and i = 4 contain information about expression in different areas
+            # central brain and vnc, respectively?
+            # the latter is not always present
+            if i == 2:
+                #print(c.prettify())
+
+                tds = c.find_all('td')
+
+                for j, t in enumerate(tds):
+                    '''
+                    print(j, t)
+                    print('')
+                    print('')
+                    '''
+
+                    if j == 4:
+                        print(t.contents)
+
+                for j, g in enumerate(c.children):
+                    #print(j, g)
+
+                    # should be the column containing the expression information
+                    if j == 5:
+                        #print(g)
+
+                        break_all = True
+                        break
+
+                if break_all:
+                    break
+
+
