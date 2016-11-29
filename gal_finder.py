@@ -86,11 +86,11 @@ for i in range(0,len(df)):
         soup = BeautifulSoup(data, 'lxml')
 
         # the contents of the table listing information about matching lines
-        t = soup.find('table', id='linelist')
+        tab = soup.find('table', id='linelist')
 
         expression = ''
 
-        for i, c in enumerate(t.children):
+        for i, c in enumerate(tab.children):
 
             # i = 2 and i = 4 contain information about expression in different areas
             # central brain and vnc, respectively?
@@ -103,6 +103,11 @@ for i in range(0,len(df)):
 
                     # should be the column with the expression data
                     if i == 2 and j == 4:
+                        # it seems this will only happen for lines that have only been imaged in
+                        # the VNC, which I am currently not interested in anyway
+                        if len(t.contents) == 0:
+                            continue
+
                         expression = t.contents[0]
 
                         intensity = int(re_i.search(expression).groups()[0])
@@ -126,13 +131,18 @@ for i in range(0,len(df)):
 
                         break
 
+# sum of squared intensity scores out of region
+# might help find approximately sparse lines faster
+lines_prime = [(l[0], l[1], l[2], l[3]**2) for l in lines]
 
-# TODO take all over min intensity, sort ascending by external intensity
 # sorted by intensity in roi (descending)
-print(sorted(lines, key=lambda x: x[1], reverse=True))
+for e in sorted(lines_prime, key=lambda x: x[1], reverse=True):
+    print(e)
 
+print('')
 # lines over min_intensity in roi, sorted (ascending) by intensity out of roi (including VNC)
-print(sorted([l for l in lines if l[1] > min_intensity], key=lambda x: x[3]))
+for e in sorted([l for l in lines_prime if l[1] >= min_intensity], key=lambda x: x[3]):
+    print(e)
 
 to_save = (roi, lines)
 pickle.dump(to_save, open('roi_and_lines.p', 'wb'))
